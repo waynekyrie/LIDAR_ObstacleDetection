@@ -1,0 +1,6 @@
+PCD_Path=pcd/115.pcd
+gridSize=0.4
+mapSize=51;
+LIDAR_rangeLimit=20;
+LIDAR_Height=1.8
+PassAbility=0.3
