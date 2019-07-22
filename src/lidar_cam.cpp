@@ -37,7 +37,7 @@ void toPCD(string infile)
             input>>num;
 
             if(point.x>=0){
-                point.r=255;
+                //point.r=255;
                 points->push_back(point);
             }
         }
@@ -49,16 +49,17 @@ void toPCD(string infile)
 }
 
 
-void LIDAR_Detect()
+std::queue<Eigen::Vector2i> LIDAR_Detect(int idx, ParameterReader pd)
 {
-    ParameterReader pd;
-    string file_path = pd.getData("PCD_Path").c_str();
-    float gridSize=atof(pd.getData("gridSize").c_str());
+    auto t1 = chrono::high_resolution_clock::now();
+    string file_path = "pcd/"+to_string(idx)+".pcd";
     int mapSize=atoi(pd.getData("mapSize").c_str());
-    int limit=atoi(pd.getData("LIDAR_rangeLimit").c_str()); /// unit m
     float LIDAR_height=atof(pd.getData("LIDAR_Height").c_str());
     float PassAbility=atof(pd.getData("PassAbility").c_str());
+    float gridSize=atof(pd.getData("gridSize").c_str());
+    int limit=floor(gridSize*mapSize);
     float vehicleHeight = 1;
+    std::queue<Eigen::Vector2i> obstacleQ;
 
     GridMap map;
     map.createMap(gridSize, mapSize);
@@ -69,13 +70,13 @@ void LIDAR_Detect()
     if(pcl::io::loadPCDFile<PointT>(file_path,*cloud)==-1)
     {
         cout<<"Error reading file "<<file_path<<endl;
-        return;
+        return obstacleQ;
     }
 
     int u, v;
 
     //map to points to gridMap
-    PointCloud::Ptr newPoints=PointCloud::Ptr(new PointCloud());
+    //PointCloud::Ptr newPoints=PointCloud::Ptr(new PointCloud());
     for(int i=0; i<cloud->size(); i++){
         PointT point = cloud->points[i];
         if(point.x>=limit || point.y >= round(limit/2) || point.y <= -round(limit/2))
@@ -102,13 +103,12 @@ void LIDAR_Detect()
     //compute height histogram for each grid
     for(int i=0;i<mapSize;i++){
         for(int j=-center; j<center;j++){
-
             int c=j+center;
             int r=i;
             map.computeHeightInGrid(c,r,(-LIDAR_height+PassAbility));
-            PointLink* PL=map.getPointInGrid(c,r);
+            //PointLink* PL=map.getPointInGrid(c,r);
             double height=(map.getColor(c,r));
-            while(PL!=NULL){
+            /*while(PL!=NULL){
                 PointT p=PL->point;
                 if(height>= (-LIDAR_height+PassAbility)){
                     p.r=255;
@@ -122,11 +122,26 @@ void LIDAR_Detect()
                 }
                 newPoints->push_back(p);
                 PL=PL->nextP;
+            }*/
+            if(height>= (-LIDAR_height+PassAbility)){
+                Eigen::Vector2i obstacle;
+                obstacle<<j, i;
+                obstacleQ.push(obstacle);
             }
         }
     }
-    cout << "new points, writing to "<< endl;
-    pcl::io::savePCDFile("outfile.pcd",*newPoints);
+    auto time = std::chrono::high_resolution_clock::now() - t1;
+    long long microseconds = std::chrono::duration_cast<std::chrono::milliseconds>(time).count();
+    cout << "Compute Time:  "<<microseconds<< endl;
+
+    /*pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+    viewer->setBackgroundColor (0, 0, 0);
+    viewer->addPointCloud<PointT> (newPoints, "sample cloud");
+    while (!viewer->wasStopped ())
+    {
+      viewer->spinOnce (100);
+    }*/
+    return obstacleQ;
 }
 
 

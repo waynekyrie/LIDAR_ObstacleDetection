@@ -1,0 +1,12 @@
+package exlcm;
+struct publish_t
+{
+    int64_t  timestamp;
+    string   name;
+    float gridSize;
+    int16_t x;
+    int16_t y;
+    boolean start;
+    boolean tail;
+    int16_t numObstacles;
+}

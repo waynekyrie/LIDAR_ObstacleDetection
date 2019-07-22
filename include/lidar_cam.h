@@ -17,6 +17,11 @@
 #include <pcl/common/common.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/io/vlp_grabber.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <stdio.h>
+#include <lcm/lcm-cpp.hpp>
+#include <chrono>
 
 using namespace std;
 
@@ -52,19 +57,23 @@ public:
 
         map = new GRID* [map_size];
         int i;
-        center = round(mapSize/2);
+        //center = round(mapSize/2);
 
         for(i=0; i < map_size; i++)
         {
             map[i] = new GRID[map_size];
-            for(int j=0; j<map_size; j++){
+            /*for(int j=0; j<map_size; j++){
                 GRID newGRID;
                 map[i][j]=newGRID;
                 map[i][j].traversability=0;
                 map[i][j].y = i;
                 map[i][j].x = j - center;
-            }
+            }*/
         }
+    }
+
+    void labelTraversability(){
+
     }
 
     void computeHeightInGrid(int u, int v, double heightLimit){
@@ -120,8 +129,41 @@ public:
     }
 };
 
-void toPCD(string infile);
-void LIDAR_Detect();
+class VLP16
+{
+public:
+    boost::shared_ptr<pcl::VLPGrabber> mVlpGrabber;
+
+    boost::signals2::connection mConnection;
+
+    pcl::PointCloud<PointT>::ConstPtr mCloud;
+
+    boost::mutex mVLPMutex;
+
+    void Start(string ipAddress, unsigned short port)
+    {
+        mVlpGrabber = boost::shared_ptr<pcl::VLPGrabber>(new pcl::VLPGrabber(boost::asio::ip::address::from_string(ipAddress), boost::lexical_cast<unsigned short>(port)));
+        cout<<"0"<<endl;
+        boost::function<void(const pcl::PointCloud<PointT>::ConstPtr&)> cb = boost::bind(&VLP16::vlpCallback, this, _1);
+        cout<<"1"<<endl;
+        mConnection = mVlpGrabber->registerCallback(cb);
+        cout<<"2"<<endl;
+        mVlpGrabber->start();
+        PointCloud::Ptr points=PointCloud::Ptr(new PointCloud());
+        cout<<"3"<<endl;
+    }
+    void vlpCallback(const pcl::PointCloud<PointT>::ConstPtr& cloudPtr)
+    {
+        boost::mutex::scoped_lock lock(mVLPMutex);
+        mCloud = cloudPtr;
+    }
+    void Close()
+    {
+        mVlpGrabber->stop();
+        mConnection.disconnect();
+    }
+};
+
 
 class ParameterReader
 {
@@ -168,3 +210,7 @@ public:
 public:
     map<string, string> data;
 };
+
+
+void toPCD(string infile);
+std::queue<Eigen::Vector2i> LIDAR_Detect(int idx, ParameterReader pd);
